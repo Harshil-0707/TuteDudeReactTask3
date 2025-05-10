@@ -6,21 +6,28 @@ const TodoContext = createContext();
 // Custom hook to use the todo context
 export const useTodoContext = () => useContext(TodoContext);
 
-export const TodoProvider = ({ children }) => {
-  const [todos, setTodos] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-
-  // Load todos from localStorage on initial render
-  useEffect(() => {
+// Load todos safely from localStorage
+const loadTodosFromLocalStorage = () => {
+  try {
     const storedTodos = localStorage.getItem("todos");
-    if (storedTodos) {
-      setTodos(JSON.parse(storedTodos));
-    }
-  }, []);
+    return storedTodos ? JSON.parse(storedTodos) : [];
+  } catch (error) {
+    console.error("Failed to parse todos from localStorage:", error);
+    return [];
+  }
+};
+
+export const TodoProvider = ({ children }) => {
+  const [todos, setTodos] = useState(loadTodosFromLocalStorage);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Save todos to localStorage whenever todos change
   useEffect(() => {
-    localStorage.setItem("todos", JSON.stringify(todos));
+    try {
+      localStorage.setItem("todos", JSON.stringify(todos));
+    } catch (error) {
+      console.error("Failed to save todos to localStorage:", error);
+    }
   }, [todos]);
 
   // Add a new todo
@@ -31,19 +38,19 @@ export const TodoProvider = ({ children }) => {
         text,
         completed: false,
       };
-      setTodos([...todos, newTodo]);
+      setTodos((prev) => [...prev, newTodo]);
     }
   };
 
   // Delete a todo
   const deleteTodo = (id) => {
-    setTodos(todos.filter((todo) => todo.id !== id));
+    setTodos((prev) => prev.filter((todo) => todo.id !== id));
   };
 
   // Toggle todo completion status
   const toggleTodo = (id) => {
-    setTodos(
-      todos.map((todo) =>
+    setTodos((prev) =>
+      prev.map((todo) =>
         todo.id === id ? { ...todo, completed: !todo.completed } : todo
       )
     );
@@ -59,12 +66,11 @@ export const TodoProvider = ({ children }) => {
     setSearchTerm(term);
   };
 
-  // Get filtered todos based on search term
+  // Filtered todos (do not affect what's stored in localStorage)
   const filteredTodos = todos.filter((todo) =>
     todo.text.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Context value
   const value = {
     todos: filteredTodos,
     addTodo,
